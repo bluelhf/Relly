@@ -1,0 +1,5 @@
+name: Relly
+version: ${project.version}
+main: io.github.bluelhf.relly.Relly
+api-version: 1.16
+description: Runtime plugin reloading for developers
