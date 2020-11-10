@@ -13,7 +13,7 @@ public final class Relly extends JavaPlugin {
         OperationResult result = RellyUtil.enablePlugin(Bukkit.getWorldContainer().toPath().resolve("Test.jar"));
         getLogger().info("Loading Test.jar resulted in operation result: " + result);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this, () -> {
-            OperationResult unloadResult = RellyUtil.disablePlugin(Bukkit.getPluginManager().getPlugin("Vault"));
+            OperationResult unloadResult = RellyUtil.disablePlugin(Bukkit.getPluginManager().getPlugin("Vault"), true);
             getLogger().info("Unloading Vault resulted in operation result: " + unloadResult);
         }, 80);
 

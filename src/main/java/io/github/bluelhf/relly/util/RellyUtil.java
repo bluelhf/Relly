@@ -1,24 +1,24 @@
 package io.github.bluelhf.relly.util;
 
+import com.google.common.graph.EndpointPair;
+import com.google.common.graph.MutableGraph;
 import io.github.bluelhf.reflectors.Reflectors;
 import io.github.bluelhf.reflectors.dynamics.InstanceFieldReference;
 import io.github.bluelhf.reflectors.dynamics.InstanceReference;
 import org.bukkit.Bukkit;
 import org.bukkit.Keyed;
 import org.bukkit.command.Command;
-import org.bukkit.command.CommandMap;
 import org.bukkit.command.PluginCommandYamlParser;
 import org.bukkit.command.SimpleCommandMap;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Recipe;
-import org.bukkit.plugin.InvalidDescriptionException;
-import org.bukkit.plugin.InvalidPluginException;
-import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.*;
 
+import java.net.URISyntaxException;
 import java.nio.file.Path;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Optional;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class RellyUtil {
 
@@ -80,8 +80,44 @@ public class RellyUtil {
         return OperationResult.succeed("Successfully removed command.");
     }
 
+    /**
+     * @return A list of Plugin names that depend on the input plugin.
+     * @param name The name of the plugin to find the dependants of  */
+    @SuppressWarnings({"UnstableApiUsage", "unchecked"})
+    public static HashSet<String> findDependants(String name) {
+        PluginManager pm = Bukkit.getPluginManager();
+        if (!(pm instanceof SimplePluginManager)) return new HashSet<>();
+        InstanceReference ref = Reflectors.reflect(pm);
+
+        Optional<InstanceFieldReference<Object>> maybeField = ref.field("dependencyGraph");
+        if (maybeField.isEmpty()) return new HashSet<>();
+        MutableGraph<String> graph = (MutableGraph<String>) maybeField.get().get().getResult();
+        if (graph == null) return new HashSet<>();
+
+        HashSet<String> dependants = new HashSet<>();
+        HashSet<String> targets = new HashSet<>();
+        targets.add(name);
+
+        while (targets.size() != 0) {
+            Iterator<String> targetIterator = targets.iterator();
+            while (targetIterator.hasNext()) {
+                String target = targetIterator.next();
+                HashSet<String> tempDependants = graph.edges().stream()
+                    .filter(pair -> pair.target().equalsIgnoreCase(target))
+                    .map(EndpointPair::source)
+                    .collect(Collectors.toCollection(HashSet::new));
+
+                targets.addAll(tempDependants);
+                dependants.addAll(tempDependants);
+                targetIterator.remove();
+            }
+        }
+
+        return dependants;
+    }
+
     @SuppressWarnings("ConstantConditions")
-    public static OperationResult disablePlugin(Plugin plugin) {
+    private static OperationResult disablePluginUnsafe(Plugin plugin) {
         Bukkit.getPluginManager().disablePlugin(plugin);
 
         StringBuilder message = new StringBuilder();
@@ -117,16 +153,56 @@ public class RellyUtil {
             }
         });
 
-        ref.field("fileAssociations").ifPresent(ifr -> {
-            if (ifr.get().hasResult()) {
-                InstanceReference fileAssociationsRef = Reflectors.reflect(ifr.get().getResult());
-                //TODO: Do something with this
-            }
-        });
-
         return new OperationResult(
             operations == failed ? OperationResult.State.FAIL : (failed != 0 ? OperationResult.State.PARTIAL : OperationResult.State.SUCCEED),
             message.toString()
         );
+    }
+
+    public static OperationResult disablePlugin(Plugin plugin, boolean deep) {
+        if (!deep) {
+            return disablePluginUnsafe(plugin);
+        }
+        HashSet<String> dependants = findDependants(plugin.getName());
+        dependants.forEach(s -> {
+            Plugin p;
+            if ((p = Bukkit.getPluginManager().getPlugin(s)) != null) disablePluginUnsafe(p);
+        });
+
+        disablePluginUnsafe(plugin);
+
+        // TODO: Do OperationResult
+        return OperationResult.succeed();
+    }
+
+    public static OperationResult reloadPlugin(Plugin plugin, boolean deep) {
+        if (!deep) {
+            return disablePluginUnsafe(plugin);
+        }
+        HashSet<String> dependants = findDependants(plugin.getName());
+        HashSet<Path> disabled = new HashSet<>();
+        dependants.forEach(s -> {
+            Plugin p;
+            if ((p = Bukkit.getPluginManager().getPlugin(s)) != null) {
+                try {
+                    disabled.add(Paths.get(p.getClass().getProtectionDomain().getCodeSource().getLocation().toURI()));
+                    disablePluginUnsafe(p);
+                } catch (URISyntaxException e) {
+                    //TODO: Log to OperationResult
+                }
+            }
+
+        });
+
+        try {
+            Path jarPath = Paths.get(plugin.getClass().getProtectionDomain().getCodeSource().getLocation().toURI());
+            disablePluginUnsafe(plugin);
+            enablePlugin(jarPath);
+        } catch (URISyntaxException e) {
+            //TODO: Log to OperationResult
+        }
+
+        disabled.forEach(RellyUtil::enablePlugin);
+        return OperationResult.succeed();
     }
 }
