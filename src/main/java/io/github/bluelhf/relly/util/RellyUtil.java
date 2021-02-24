@@ -4,6 +4,7 @@ import com.google.common.graph.EndpointPair;
 import com.google.common.graph.MutableGraph;
 import com.moderocky.mask.mirror.FieldMirror;
 import com.moderocky.mask.mirror.Mirror;
+import io.github.bluelhf.relly.Relly;
 import org.bukkit.Bukkit;
 import org.bukkit.Keyed;
 import org.bukkit.command.Command;
@@ -13,12 +14,12 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Recipe;
 import org.bukkit.plugin.*;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.plugin.java.JavaPluginLoader;
+import org.bukkit.plugin.java.PluginClassLoader;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
-import java.net.URISyntaxException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -64,6 +65,48 @@ public class RellyUtil {
         }
     }
 
+    public static File getPluginsFolder() {
+        return Relly.getInstance().getDataFolder().getParentFile();
+    }
+
+    public static File getFile(Plugin plugin) {
+        try {
+            Class<?> clsas = Class.forName(plugin.getDescription().getMain());
+            PluginClassLoader loader = (PluginClassLoader) clsas.getClassLoader();
+            return (File) new Mirror<>(loader).field("file", PluginClassLoader.class).get();
+        } catch (ClassNotFoundException e) {
+            throw new IllegalArgumentException("Tried to get file for invalid plugin " + plugin.getName());
+        }
+    }
+
+    @Nullable
+    public static File getFileByMain(File directory, String main) {
+        if (!directory.isDirectory()) return directory;
+        for (File file : directory.listFiles(File::isFile)) {
+            PluginLoader loader = getAssociatedLoader(file);
+            if (loader == null) continue;
+            try {
+                PluginDescriptionFile descriptionFile = loader.getPluginDescription(file);
+                if (main.equals(descriptionFile.getMain())) {
+                    return file;
+                }
+            } catch (InvalidDescriptionException ignored) {
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    public static PluginDescriptionFile getPluginDescription(File file) {
+        PluginLoader loader = getAssociatedLoader(file);
+        if (loader == null) return null;
+        try {
+            return loader.getPluginDescription(file);
+        } catch (InvalidDescriptionException ignored) {
+        }
+        return null;
+    }
+
     /**
      * @param file The file to find the PluginLoader for.
      * @return The PluginLoader associated with the given {@link File}, or null if none is found.
@@ -90,6 +133,20 @@ public class RellyUtil {
      * @param filePath The path to load the plugin from.
      * */
     public static OperationResult enablePlugin(Path filePath) {
+        return enablePlugin((PluginClassLoader) Relly.getInstance().getClass().getClassLoader(), filePath);
+    }
+
+    /**
+     * Loads and enables a plugin from a {@link Path} to the jarfile.
+     * @return An {@link OperationResult} depicting the result of the plugin load.
+     * @param classLoader The ClassLoader to use
+     * @param filePath The path to load the plugin from.
+     * */
+    private static OperationResult enablePlugin(PluginClassLoader classLoader, Path filePath) {
+        PluginDescriptionFile desc;
+        if ((desc = getPluginDescription(filePath.toFile())) != null) {
+            if (Relly.BLACKLIST.contains(desc.getName())) return OperationResult.fail("Cannot enable blacklisted plugin " + desc.getName());
+        }
         if (!filePath.toFile().exists()) {
             return OperationResult.fail(
                 "The provided file could not be found."
@@ -105,19 +162,13 @@ public class RellyUtil {
         Plugin plugin;
 
         try {
-            plugin = Bukkit.getPluginManager().loadPlugin(filePath.toFile());
-            if (plugin == null) throw new InvalidPluginException("Invalid plugin");
+            PluginLoader pluginLoader = getAssociatedLoader(filePath.toFile());
+            if (pluginLoader == null) throw new IllegalArgumentException("Cannot load non-plugin " + filePath);
+            Mirror<PluginLoader> pluginLoaderMirror = new Mirror<>(pluginLoader);
+            List<PluginClassLoader> loaders = (List<PluginClassLoader>) pluginLoaderMirror.field("loaders", JavaPluginLoader.class).get();
+            loaders.add(classLoader);
+            plugin = classLoader.getPlugin();
             plugin.onLoad();
-        } catch (InvalidPluginException exception) {
-            return OperationResult.fail(
-                "The provided file is not a valid plugin.",
-                exception
-            );
-        } catch (InvalidDescriptionException exception) {
-            return OperationResult.fail(
-                "The provided file has an invalid plugin description.",
-                exception
-            );
         } catch (Throwable t) {
             return OperationResult.fail(
                     "An exception occurred while loading the plugin.",
@@ -160,28 +211,29 @@ public class RellyUtil {
         if (graph == null) return new HashSet<>();
 
         HashSet<String> dependants = new HashSet<>();
-        HashSet<String> targets = new HashSet<>();
+        ArrayDeque<String> targets = new ArrayDeque<>();
+
         targets.add(name);
 
-        while (targets.size() != 0) {
-            Iterator<String> targetIterator = targets.iterator();
-            while (targetIterator.hasNext()) {
-                String target = targetIterator.next();
-                HashSet<String> tempDependants = graph.edges().stream()
-                    .filter(pair -> pair.target().equalsIgnoreCase(target))
+        while (!targets.isEmpty()) {
+            String next = targets.pop();
+            HashSet<String> tempDependants = graph.edges().stream()
+                    .filter(pair -> pair.target().equalsIgnoreCase(next))
                     .map(EndpointPair::source)
+                    .filter(string -> !dependants.contains(string))
                     .collect(Collectors.toCollection(HashSet::new));
 
-                targets.addAll(tempDependants);
-                dependants.addAll(tempDependants);
-                targetIterator.remove();
-            }
+            targets.addAll(tempDependants);
+            dependants.addAll(tempDependants);
         }
 
         return dependants;
     }
 
     private static OperationResult disablePluginUnsafe(Plugin plugin) {
+        if (Relly.BLACKLIST.contains(plugin.getDescription().getName()))
+            return OperationResult.fail("Cannot disable blacklisted plugin " + plugin.getDescription().getName());
+
         ArrayList<OperationResult> results = new ArrayList<>();
         try {
             Bukkit.getPluginManager().disablePlugin(plugin);
@@ -217,6 +269,9 @@ public class RellyUtil {
     }
 
     public static OperationResult disablePlugin(Plugin plugin, boolean deep) {
+        if (Relly.BLACKLIST.contains(plugin.getDescription().getName()))
+            return OperationResult.fail("Cannot disable blacklisted plugin " + plugin.getDescription().getName());
+
         if (!deep) {
             return disablePluginUnsafe(plugin);
         }
@@ -238,35 +293,40 @@ public class RellyUtil {
     }
 
     public static OperationResult reloadPlugin(Plugin plugin, boolean deep) {
+        if (Relly.BLACKLIST.contains(plugin.getDescription().getName()))
+            return OperationResult.fail("Cannot reload blacklisted plugin " + plugin.getDescription().getName());
+        
         ArrayList<OperationResult> results = new ArrayList<>();
-        HashSet<Path> disabled = new HashSet<>();
+        HashMap<String, PluginClassLoader> disabled = new HashMap<>();
 
         if (deep) {
             HashSet<String> dependants = findDependants(plugin.getName());
             dependants.forEach(s -> {
                 Plugin p;
                 if ((p = Bukkit.getPluginManager().getPlugin(s)) != null) {
-                    try {
-                        disabled.add(Paths.get(p.getClass().getProtectionDomain().getCodeSource().getLocation().toURI()));
-                        results.add(disablePluginUnsafe(p));
-                    } catch (URISyntaxException e) {
-                        results.add(new OperationResult(OperationResult.State.FAIL, "Failed to disable plugin " + p.getName() + ".", e));
-                    }
+                    disabled.put(p.getDescription().getMain(), (PluginClassLoader) p.getClass().getClassLoader());
+                    results.add(disablePluginUnsafe(p));
                 }
             });
         }
 
-        try {
-            Path jarPath = Paths.get(plugin.getClass().getProtectionDomain().getCodeSource().getLocation().toURI());
-            results.add(disablePluginUnsafe(plugin));
-            results.add(enablePlugin(jarPath));
-        } catch (URISyntaxException e) {
-            results.add(new OperationResult(OperationResult.State.FAIL, "Failed to reload plugin " + plugin.getName() + ".", e));
+        PluginClassLoader loader = (PluginClassLoader) plugin.getClass().getClassLoader();
+        results.add(disablePluginUnsafe(plugin));
+        File file = getFileByMain(getPluginsFolder(), plugin.getDescription().getMain());
+        if (file == null) {
+            results.add(OperationResult.fail("Could not find plugin jarfile by main class " + plugin.getDescription().getMain()));
+        } else {
+            results.add(enablePlugin(loader, file.toPath()));
         }
 
         if (deep) {
-            for (Path p : disabled) {
-                results.add(RellyUtil.enablePlugin(p));
+            for (Map.Entry<String, PluginClassLoader> disabledPlugin : disabled.entrySet()) {
+                File mainFile = getFileByMain(getPluginsFolder(), disabledPlugin.getKey());
+                if (mainFile == null) {
+                    results.add(OperationResult.fail("Could not find plugin jarfile by main class" + disabledPlugin.getKey()));
+                    continue;
+                }
+                results.add(RellyUtil.enablePlugin(disabledPlugin.getValue(), mainFile.toPath()));
             }
         }
         return OperationResult.combine(results);

@@ -5,14 +5,18 @@ import dev.jorel.commandapi.CommandAPI;
 import io.github.bluelhf.relly.command.RellyCommand;
 import io.github.bluelhf.relly.util.FileMonitor;
 import io.github.bluelhf.relly.util.RellyUtil;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
 
 public final class Relly extends BukkitPlugin {
 
-    FileMonitor pluginMonitor = new FileMonitor(getDataFolder().getParentFile(), Duration.ofSeconds(5), (file, change) -> {
+    public static final List<String> BLACKLIST = Arrays.asList("FastAsyncWorldEdit", "WorldEdit");
 
+    FileMonitor pluginMonitor = new FileMonitor(getDataFolder().getParentFile(), Duration.ofSeconds(5), (file, change) -> {
         if (!file.getName().endsWith(".jar")) return;
         if (RellyUtil.isLoaded(file)) {
             JavaPlugin plugin;
@@ -45,6 +49,10 @@ public final class Relly extends BukkitPlugin {
     public void startup() {
         pluginMonitor.start();
         CommandAPI.onEnable(this);
+    }
+
+    public void blacklist(Plugin plugin) {
+        BLACKLIST.add(plugin.getName());
     }
 
     @Override
