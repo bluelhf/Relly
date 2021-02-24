@@ -3,6 +3,8 @@ package io.github.bluelhf.relly.util;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.*;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
@@ -79,5 +81,29 @@ public class OperationResult {
         SUCCEED,
         PARTIAL,
         FAIL
+    }
+
+    public static OperationResult combine(ArrayList<OperationResult> results) {
+        StringBuilder builder = new StringBuilder();
+        int fails = 0;
+        for (OperationResult result : results) {
+            if (result.state == State.FAIL) fails++;
+            builder.append(result.state).append(":\n");
+            builder.append("  ").append(result.message.replace("\n", "\n  ")).append("\n");
+            if (result.thrown != null) {
+                builder.append("  Stack trace:\n");
+
+                StringWriter sw = new StringWriter();
+                PrintWriter pw = new PrintWriter(sw);
+                result.thrown.printStackTrace(pw);
+
+                builder.append("    ").append(sw.toString().replace("\n", "\n    ").replace("\u0009", "    ").replace("\r", ""));
+            }
+        }
+
+        State s = State.SUCCEED;
+        if (fails > 0) s = State.PARTIAL;
+        if (fails == results.size()) s = State.FAIL;
+        return new OperationResult(s, builder.toString());
     }
 }

@@ -1,0 +1,5 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="update.ps1" type="PowerShellRunType" factoryName="PowerShell" scriptUrl="$PROJECT_DIR$/run/update.ps1" workingDirectory="$PROJECT_DIR$/run/">
+    <method v="2" />
+  </configuration>
+</component>

@@ -26,6 +26,14 @@
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
+
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>dev.jorel</groupId>
+                            <artifactId>commandapi-annotations</artifactId>
+                            <version>5.3</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
             <plugin>
@@ -39,11 +47,57 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
+                            <artifactSet>
+                                <excludes>
+                                    <exclude>dev.jorel:commandapi-core</exclude>
+                                </excludes>
+                            </artifactSet>
+
+                            <relocations>
+                                <relocation>
+                                    <pattern>com.moderocky.mask</pattern>
+                                    <shadedPattern>io.github.bluelhf.relly.mask</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>dev.jorel.commandapi-shade</pattern>
+                                    <shadedPattern>io.github.bluelhf.relly.commandapi</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>dev.jorel.commandapi-annotations</pattern>
+                                    <shadedPattern>io.github.bluelhf.relly.commandapi.annotations</shadedPattern>
+                                </relocation>
+                            </relocations>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.1.2</version>
+                <executions>
+                    <execution>
+                        <id>copy</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <outputDirectory>${basedir}/run/plugins</outputDirectory>
+                    <artifactItems>
+                        <artifactItem>
+                            <groupId>${project.groupId}</groupId>
+                            <artifactId>${project.artifactId}</artifactId>
+                            <version>${project.version}</version>
+                            <type>${project.packaging}</type>
+                        </artifactItem>
+                    </artifactItems>
+                </configuration>
+            </plugin>
+
         </plugins>
         <resources>
             <resource>
@@ -63,8 +117,13 @@
             <url>https://oss.sonatype.org/content/groups/public/</url>
         </repository>
         <repository>
-            <id>jitpack.io</id>
-            <url>https://jitpack.io</url>
+            <id>pan-repo</id>
+            <name>Pandaemonium Repository</name>
+            <url>https://gitlab.com/api/v4/projects/18568066/packages/maven</url>
+        </repository>
+        <repository>
+            <id>commandapi</id>
+            <url>https://raw.githubusercontent.com/JorelAli/CommandAPI/mvn-repo/</url>
         </repository>
     </repositories>
 
@@ -72,7 +131,7 @@
         <dependency>
             <groupId>com.destroystokyo.paper</groupId>
             <artifactId>paper-api</artifactId>
-            <version>1.16.4-R0.1-SNAPSHOT</version>
+            <version>1.16.5-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -82,9 +141,28 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
-            <groupId>com.github.bluelhf</groupId>
-            <artifactId>Reflectors</artifactId>
-            <version>master-SNAPSHOT</version>
+            <groupId>com.moderocky</groupId>
+            <artifactId>Mask-Bukkit</artifactId>
+            <version>3.0.0-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>dev.jorel</groupId>
+            <artifactId>commandapi-shade</artifactId>
+            <version>5.8</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>dev.jorel</groupId>
+            <artifactId>commandapi-annotations</artifactId>
+            <version>5.8</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>commons-codec</groupId>
+            <artifactId>commons-codec</artifactId>
+            <version>1.6</version>
+            <scope>compile</scope>
         </dependency>
     </dependencies>
 </project>
