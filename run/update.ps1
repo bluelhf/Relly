@@ -12,6 +12,6 @@ if (("$LastBuild" -eq "") -or ($LastBuild -ne $Build) -or ($MC -ne $LastMC)) {
     $BuildInfo = (Invoke-WebRequest -UseBasicParsing -Uri "https://papermc.io/api/v2/projects/paper/versions/$MC/builds/$Build") | ConvertFrom-Json
     $Version = $BuildInfo.downloads.application.name;
     Write-Host "Downloading $Version"
-    $Job = Start-BitsTransfer -Asynchronous -Source https://papermc.io/api/v2/projects/paper/versions/$MC/builds/$Build/downloads/$Version -Destination ./server.jar
+    $Job = Start-BitsTransfer -Source https://papermc.io/api/v2/projects/paper/versions/$MC/builds/$Build/downloads/$Version -Destination ./server.jar
 
 }
