@@ -8,8 +8,12 @@ import io.github.bluelhf.relly.util.RellyUtil;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
 
 public final class Relly extends BukkitPlugin {
+
+    public static final List<String> BLACKLIST = Arrays.asList("FastAsyncWorldEdit", "WorldEdit");
 
     FileMonitor pluginMonitor = new FileMonitor(getDataFolder().getParentFile(), Duration.ofSeconds(5), (file, change) -> {
 

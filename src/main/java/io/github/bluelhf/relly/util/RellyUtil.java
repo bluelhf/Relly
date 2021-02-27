@@ -4,6 +4,7 @@ import com.google.common.graph.EndpointPair;
 import com.google.common.graph.MutableGraph;
 import com.moderocky.mask.mirror.FieldMirror;
 import com.moderocky.mask.mirror.Mirror;
+import io.github.bluelhf.relly.Relly;
 import org.bukkit.Bukkit;
 import org.bukkit.Keyed;
 import org.bukkit.command.Command;
@@ -105,6 +106,10 @@ public class RellyUtil {
         Plugin plugin;
 
         try {
+            Plugin pl = getJavaPlugin(filePath.toFile());
+            if (pl != null && Relly.BLACKLIST.contains(pl.getDescription().getName())) {
+                return OperationResult.fail("The provided plugin is blacklisted.");
+            }
             plugin = Bukkit.getPluginManager().loadPlugin(filePath.toFile());
             if (plugin == null) throw new InvalidPluginException("Invalid plugin");
             plugin.onLoad();
@@ -182,6 +187,9 @@ public class RellyUtil {
     }
 
     private static OperationResult disablePluginUnsafe(Plugin plugin) {
+        if (Relly.BLACKLIST.contains(plugin.getDescription().getName())) {
+            return OperationResult.fail("The provided plugin is blacklisted.");
+        }
         ArrayList<OperationResult> results = new ArrayList<>();
         try {
             Bukkit.getPluginManager().disablePlugin(plugin);
@@ -217,6 +225,10 @@ public class RellyUtil {
     }
 
     public static OperationResult disablePlugin(Plugin plugin, boolean deep) {
+        if (Relly.BLACKLIST.contains(plugin.getDescription().getName())) {
+            return OperationResult.fail("The provided plugin is blacklisted.");
+        }
+
         if (!deep) {
             return disablePluginUnsafe(plugin);
         }
@@ -238,6 +250,10 @@ public class RellyUtil {
     }
 
     public static OperationResult reloadPlugin(Plugin plugin, boolean deep) {
+        if (Relly.BLACKLIST.contains(plugin.getDescription().getName())) {
+            return OperationResult.fail("The provided plugin is blacklisted.");
+        }
+
         ArrayList<OperationResult> results = new ArrayList<>();
         HashSet<Path> disabled = new HashSet<>();
 
