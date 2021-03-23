@@ -8,12 +8,14 @@ import io.github.bluelhf.relly.Relly;
 import org.bukkit.Bukkit;
 import org.bukkit.Keyed;
 import org.bukkit.command.Command;
+import org.bukkit.command.PluginCommand;
 import org.bukkit.command.PluginCommandYamlParser;
 import org.bukkit.command.SimpleCommandMap;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Recipe;
 import org.bukkit.plugin.*;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.plugin.java.PluginClassLoader;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
@@ -46,6 +48,15 @@ public class RellyUtil {
         }
 
         return false;
+    }
+
+    /**
+     * @param target The plugin to get the file of
+     * @return The {@link File} the given {@link Plugin} was loaded from.
+     * */
+    public static File getPluginSource(Plugin target) {
+        PluginClassLoader cl = (PluginClassLoader) target.getClass().getClassLoader();
+        return (File) (new Mirror<>(cl)).field("file").get(cl);
     }
 
     /**
@@ -138,6 +149,10 @@ public class RellyUtil {
 
     @SuppressWarnings({"ConstantConditions"})
     private static OperationResult removeCommand(Command c) {
+        PluginCommand pluginCommand;
+        if ((pluginCommand = Bukkit.getPluginCommand(c.getName())) != null) pluginCommand.setExecutor(null);
+        c.unregister(Bukkit.getServer().getCommandMap());
+        Bukkit.getServer().getCommandMap().getKnownCommands().remove(c.getName());
         Mirror<PluginManager> ref = new Mirror<>(Bukkit.getPluginManager());
 
         FieldMirror<Object> commandMapField = ref.field("commandMap", SimplePluginManager.class);
@@ -146,7 +161,11 @@ public class RellyUtil {
 
         if (commandMap != null) {
             commandMap.getKnownCommands().remove(c.getName());
+            for (String alias : c.getAliases()) {
+                commandMap.getKnownCommands().remove(alias);
+            }
         }
+
         Bukkit.getOnlinePlayers().forEach(Player::updateCommands);
         return OperationResult.succeed("Successfully removed command.");
     }
