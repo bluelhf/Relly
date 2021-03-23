@@ -70,7 +70,7 @@ public class OperationResult {
     public String toString() {
         boolean hasInfo = message != null || thrown != null;
         return state + (!hasInfo ? "" : "{" +
-            ((message != null) ? message + (thrown != null ? ", " : "") : "") +
+            ((message != null) ? message + (thrown != null ? ", \n" : "") : "") +
             ((thrown != null) ? "  " + Arrays.stream(thrown.getStackTrace()).map(StackTraceElement::toString).collect(Collectors.joining("\n  ")) : "") +
             "}"
         );
