@@ -1,14 +1,28 @@
 package io.github.bluelhf.relly.style;
 
 import io.github.bluelhf.relly.util.OperationResult;
+import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
+import java.util.ArrayList;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 public class Messages {
+    public static final Supplier<Audience> ADMIN_AUDIENCE = () -> {
+        ArrayList<Audience> audiences = new ArrayList<>();
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (player.hasPermission("relly.admin")) audiences.add(player);
+        }
+        audiences.add(Bukkit.getConsoleSender());
+        return Audience.audience(audiences);
+    };
+
     public static final Function<String, TextComponent> NO_SUCH_PLUGIN = (plugin) ->
             Component.text("A plugin by the name of '").color(Colours.ACCENT_TWO.getColour())
                     .append(Component.text(plugin).color(Colours.MAIN.getColour()))

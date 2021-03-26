@@ -98,20 +98,20 @@ public class RellyUtil {
 
     /**
      * Loads and enables a plugin from a {@link Path} to the jarfile.
-     * @return An {@link OperationResult} depicting the result of the plugin load.
+     * @return An {@link OperationOld} depicting the plugin load.
      * @param filePath The path to load the plugin from.
      * */
-    public static OperationResult enablePlugin(Path filePath) {
+    public static OperationOld enablePlugin(Path filePath) {
         if (!filePath.toFile().exists()) {
-            return OperationResult.fail(
+            return OperationOld.enable(filePath, OperationResult.fail(
                 "The provided file could not be found."
-            );
+            ));
         }
 
         if (filePath.toFile().isDirectory()) {
-            return OperationResult.fail(
+            return OperationOld.enable(filePath, OperationResult.fail(
                 "The provided file is a directory."
-            );
+            ));
         }
 
         Plugin plugin;
@@ -119,32 +119,34 @@ public class RellyUtil {
         try {
             Plugin pl = getJavaPlugin(filePath.toFile());
             if (pl != null && Relly.BLACKLIST.contains(pl.getDescription().getName())) {
-                return OperationResult.fail("The provided plugin is blacklisted.");
+                return OperationOld.enable(filePath, OperationResult.fail(
+                        "The provided plugin is blacklisted."
+                ));
             }
             plugin = Bukkit.getPluginManager().loadPlugin(filePath.toFile());
             if (plugin == null) throw new InvalidPluginException("Invalid plugin");
             plugin.onLoad();
         } catch (InvalidPluginException exception) {
-            return OperationResult.fail(
+            return OperationOld.enable(filePath, OperationResult.fail(
                 "The provided file is not a valid plugin.",
                 exception
-            );
+            ));
         } catch (InvalidDescriptionException exception) {
-            return OperationResult.fail(
+            return OperationOld.enable(filePath, OperationResult.fail(
                 "The provided file has an invalid plugin description.",
                 exception
-            );
+            ));
         } catch (Throwable t) {
-            return OperationResult.fail(
+            return OperationOld.enable(filePath, OperationResult.fail(
                     "An exception occurred while loading the plugin.",
                     t
-            );
+            ));
         }
 
         Bukkit.getPluginManager().enablePlugin(plugin);
-        return OperationResult.succeed(
+        return OperationOld.enable(filePath, OperationResult.succeed(
             "The plugin was enabled successfully."
-        );
+        ));
     }
 
     @SuppressWarnings({"ConstantConditions"})
@@ -205,15 +207,20 @@ public class RellyUtil {
         return dependants;
     }
 
-    private static OperationResult disablePluginUnsafe(Plugin plugin) {
+    private static OperationOld disablePluginUnsafe(Plugin plugin) {
         if (Relly.BLACKLIST.contains(plugin.getDescription().getName())) {
-            return OperationResult.fail("The provided plugin is blacklisted.");
+            return OperationOld.disable(plugin, OperationResult.fail(
+                    "The provided plugin is blacklisted."
+            ));
         }
-        ArrayList<OperationResult> results = new ArrayList<>();
+        ArrayList<OperationOld> results = new ArrayList<>();
         try {
             Bukkit.getPluginManager().disablePlugin(plugin);
         } catch (Throwable t) {
-            results.add(new OperationResult(OperationResult.State.FAIL, "Failed to disable plugin '" + plugin.getName() + "'", t));
+            results.add(OperationOld.disable(plugin, OperationResult.fail(
+                    "Failed to disable plugin '" + plugin.getName() + "'",
+                    t
+            )));
         }
 
 

@@ -3,7 +3,8 @@ package io.github.bluelhf.relly.util;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.*;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -70,9 +71,9 @@ public class OperationResult {
     public String toString() {
         boolean hasInfo = message != null || thrown != null;
         return state + (!hasInfo ? "" : "{" +
-            ((message != null) ? message + (thrown != null ? ", \n" : "") : "") +
-            ((thrown != null) ? "  " + Arrays.stream(thrown.getStackTrace()).map(StackTraceElement::toString).collect(Collectors.joining("\n  ")) : "") +
-            "}"
+                ((message != null) ? message + (thrown != null ? ", \n" : "") : "") +
+                ((thrown != null) ? "  " + Arrays.stream(thrown.getStackTrace()).map(StackTraceElement::toString).collect(Collectors.joining("\n  ")) : "") +
+                "}"
         );
 
     }
